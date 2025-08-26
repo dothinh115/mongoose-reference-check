@@ -1,0 +1,25 @@
+{
+  "name": "mongoose-reference-check",
+  "version": "1.0.20",
+  "description": "A Mongoose plugin that validates reference integrity before save, update, and delete operations with performance optimizations and comprehensive error handling",
+  "main": "index.js",
+  "keywords": [
+    "mongoose",
+    "mongodb",
+    "reference",
+    "validation",
+    "integrity",
+    "plugin",
+    "middleware",
+    "database"
+  ],
+  "author": "dothinh115@mail.com",
+  "license": "ISC",
+  "readme": "README.md",
+  "engines": {
+    "node": ">=12.0.0"
+  },
+  "peerDependencies": {
+    "mongoose": ">=5.0.0"
+  }
+}
