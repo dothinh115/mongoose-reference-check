@@ -1,35 +1,70 @@
-/**
- * Mongoose Reference Check Plugin
- * Validates reference integrity before save, update, and delete operations
- */
+import { Schema, Document, Types, Query } from 'mongoose';
+import type { 
+  ReferenceCheckOptions, 
+  RefField, 
+  ValidationResult, 
+  RefModel 
+} from './types';
 
-function ReferenceCheck(schema, options = {}) {
+export type {
+  ReferenceCheckOptions,
+  RefField,
+  ValidationResult,
+  RefModel
+} from './types';
+
+function ReferenceCheck<T extends Document>(
+  schema: Schema<T>,
+  options: ReferenceCheckOptions = {}
+): void {
   // Default configuration
-  const config = {
+  const config: Required<ReferenceCheckOptions> = {
     enableSave: true,
     enableUpdate: true,
     enableDelete: true,
     enableLogging: false,
-    batchSize: 100, // For bulk operations
+    batchSize: 100,
     ...options,
   };
 
   // Helper function to get reference fields from schema
-  function getRefFields(schema) {
-    const refFields = [];
+  function getRefFields(schema: Schema): RefField[] {
+    const refFields: RefField[] = [];
+    
     for (const field in schema.paths) {
-      if (schema.paths[field].options.ref) {
+      const path = schema.paths[field];
+      
+      // Handle direct reference
+      if (path.options.ref) {
         refFields.push({
           field,
-          refTo: schema.paths[field].options.ref,
+          refTo: path.options.ref as string,
         });
       }
+      
+      // Handle array of references
+      if (path instanceof Schema.Types.Array && path.schema) {
+        for (const subField in path.schema.paths) {
+          const subPath = path.schema.paths[subField];
+          if (subPath.options.ref) {
+            refFields.push({
+              field,
+              refTo: subPath.options.ref as string,
+            });
+          }
+        }
+      }
     }
+    
     return refFields;
   }
 
   // Helper function to validate single reference
-  async function validateReference(model, refModelName, value, fieldName) {
+  async function validateReference(
+    model: any,
+    value: Types.ObjectId | Types.ObjectId[] | null | undefined,
+    fieldName: string
+  ): Promise<boolean> {
     try {
       if (!value) return true;
 
@@ -38,15 +73,17 @@ function ReferenceCheck(schema, options = {}) {
         if (value.length === 0) return true;
 
         // Batch check for arrays
-        const uniqueValues = [...new Set(value)];
-        const exists = await model.exists({ _id: { $in: uniqueValues } });
-        return exists;
+        const uniqueValues = [...new Set(value.map(v => v.toString()))];
+        const count = await model.countDocuments({ 
+          _id: { $in: uniqueValues } 
+        });
+        return count === uniqueValues.length;
       }
 
       // Single value check
       const exists = await model.exists({ _id: value });
-      return exists;
-    } catch (error) {
+      return exists !== null;
+    } catch (error: any) {
       throw new Error(
         `Database error validating ${fieldName}: ${error.message}`
       );
@@ -54,7 +91,7 @@ function ReferenceCheck(schema, options = {}) {
   }
 
   // Helper function to log operations
-  function log(message) {
+  function log(message: string): void {
     if (config.enableLogging) {
       console.log(`[ReferenceCheck] ${message}`);
     }
@@ -62,7 +99,7 @@ function ReferenceCheck(schema, options = {}) {
 
   // Save middleware
   if (config.enableSave) {
-    schema.pre("save", async function (next) {
+    schema.pre<T>('save', async function (next) {
       try {
         const refFields = getRefFields(this.schema);
         if (refFields.length === 0) return next();
@@ -70,13 +107,12 @@ function ReferenceCheck(schema, options = {}) {
         log(`Validating ${refFields.length} reference fields on save`);
 
         for (const fieldObj of refFields) {
-          const value = this.get(fieldObj.field);
+          const value = this.get(fieldObj.field) as Types.ObjectId | Types.ObjectId[];
           if (!value) continue;
 
           const model = this.model(fieldObj.refTo);
           const isValid = await validateReference(
             model,
-            fieldObj.refTo,
             value,
             fieldObj.field
           );
@@ -88,9 +124,9 @@ function ReferenceCheck(schema, options = {}) {
           }
         }
 
-        log("Save validation completed successfully");
+        log('Save validation completed successfully');
         next();
-      } catch (error) {
+      } catch (error: any) {
         next(error);
       }
     });
@@ -98,11 +134,15 @@ function ReferenceCheck(schema, options = {}) {
 
   // Update middlewares
   if (config.enableUpdate) {
-    const updateOperations = ["findOneAndUpdate", "updateOne", "updateMany"];
+    const updateOperations: Array<'findOneAndUpdate' | 'updateOne' | 'updateMany'> = [
+      'findOneAndUpdate', 
+      'updateOne', 
+      'updateMany'
+    ];
 
-    schema.pre(updateOperations, async function (next) {
+    schema.pre<Query<any, T>>(updateOperations, async function (next) {
       try {
-        const payload = this.getUpdate();
+        const payload = this.getUpdate() as Record<string, any>;
         if (!payload) return next();
 
         const refFields = getRefFields(this.model.schema);
@@ -111,13 +151,12 @@ function ReferenceCheck(schema, options = {}) {
         log(`Validating ${refFields.length} reference fields on update`);
 
         for (const fieldObj of refFields) {
-          const value = payload[fieldObj.field];
+          const value = payload[fieldObj.field] as Types.ObjectId | Types.ObjectId[];
           if (!value) continue;
 
           const model = this.model.db.model(fieldObj.refTo);
           const isValid = await validateReference(
             model,
-            fieldObj.refTo,
             value,
             fieldObj.field
           );
@@ -129,9 +168,9 @@ function ReferenceCheck(schema, options = {}) {
           }
         }
 
-        log("Update validation completed successfully");
+        log('Update validation completed successfully');
         next();
-      } catch (error) {
+      } catch (error: any) {
         next(error);
       }
     });
@@ -139,9 +178,13 @@ function ReferenceCheck(schema, options = {}) {
 
   // Delete middleware with performance optimization
   if (config.enableDelete) {
-    const deleteOperations = ["deleteOne", "findOneAndDelete", "deleteMany"];
+    const deleteOperations: Array<'deleteOne' | 'findOneAndDelete' | 'deleteMany'> = [
+      'deleteOne', 
+      'findOneAndDelete', 
+      'deleteMany'
+    ];
 
-    schema.pre(deleteOperations, async function (next) {
+    schema.pre<Query<any, T>>(deleteOperations, async function (next) {
       try {
         const deletingModelName = this.model.modelName;
         const query = this.getQuery();
@@ -151,22 +194,23 @@ function ReferenceCheck(schema, options = {}) {
         // Get the item being deleted
         const deletingItem = await this.model.findOne(query);
         if (!deletingItem) {
-          log("No item found to delete, skipping reference check");
+          log('No item found to delete, skipping reference check');
           return next();
         }
 
         // Find all models that reference this model
-        const refModels = [];
+        const refModels: RefModel[] = [];
         const allModelNames = this.model.db.modelNames();
 
         for (const modelName of allModelNames) {
           if (modelName === deletingModelName) continue;
 
           const model = this.model.db.model(modelName);
-          const refFields = [];
+          const refFields: string[] = [];
 
           for (const field in model.schema.paths) {
-            if (model.schema.paths[field].options.ref === deletingModelName) {
+            const path = model.schema.paths[field];
+            if (path.options.ref === deletingModelName) {
               refFields.push(field);
             }
           }
@@ -180,7 +224,7 @@ function ReferenceCheck(schema, options = {}) {
         }
 
         if (refModels.length === 0) {
-          log("No references found, safe to delete");
+          log('No references found, safe to delete');
           return next();
         }
 
@@ -209,27 +253,29 @@ function ReferenceCheck(schema, options = {}) {
           }
         }
 
-        log("Delete validation completed successfully");
+        log('Delete validation completed successfully');
         next();
-      } catch (error) {
+      } catch (error: any) {
         next(error);
       }
     });
   }
 
   // Add utility methods to schema
-  schema.statics.validateReferences = async function (data) {
+  schema.statics.validateReferences = async function (
+    this: any,
+    data: Record<string, any>
+  ): Promise<ValidationResult[]> {
     const refFields = getRefFields(this.schema);
-    const results = [];
+    const results: ValidationResult[] = [];
 
     for (const fieldObj of refFields) {
-      const value = data[fieldObj.field];
+      const value = data[fieldObj.field] as Types.ObjectId | Types.ObjectId[];
       if (!value) continue;
 
       const model = this.model(fieldObj.refTo);
       const isValid = await validateReference(
         model,
-        fieldObj.refTo,
         value,
         fieldObj.field
       );
@@ -246,18 +292,19 @@ function ReferenceCheck(schema, options = {}) {
   };
 
   // Add instance method to check references
-  schema.methods.checkReferences = async function () {
+  schema.methods.checkReferences = async function (
+    this: T
+  ): Promise<ValidationResult[]> {
     const refFields = getRefFields(this.schema);
-    const results = [];
+    const results: ValidationResult[] = [];
 
     for (const fieldObj of refFields) {
-      const value = this.get(fieldObj.field);
+      const value = this.get(fieldObj.field) as Types.ObjectId | Types.ObjectId[];
       if (!value) continue;
 
       const model = this.model(fieldObj.refTo);
       const isValid = await validateReference(
         model,
-        fieldObj.refTo,
         value,
         fieldObj.field
       );
@@ -274,4 +321,4 @@ function ReferenceCheck(schema, options = {}) {
   };
 }
 
-module.exports = ReferenceCheck;
+export default ReferenceCheck;

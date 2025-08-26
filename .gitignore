@@ -98,3 +98,17 @@ Thumbs.db
 # Logs
 logs
 *.log
+
+# Development files
+test.js
+index.js
+
+# TypeScript
+*.tsbuildinfo
+
+# Package files
+*.tgz
+package-lock.json
+
+# Docker
+.dockerignore

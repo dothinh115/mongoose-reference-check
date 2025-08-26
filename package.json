@@ -1,8 +1,15 @@
 {
   "name": "mongoose-reference-check",
-  "version": "1.0.21",
-  "description": "A Mongoose plugin that validates reference integrity before save, update, and delete operations with performance optimizations and comprehensive error handling",
-  "main": "index.js",
+  "version": "2.0.0",
+  "description": "A TypeScript-ready Mongoose plugin that validates reference integrity before save, update, and delete operations with performance optimizations and comprehensive error handling",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "prepare": "npm run build",
+    "dev": "tsc --watch",
+    "test:ts": "npm run build && npx ts-node test-typescript.ts"
+  },
   "keywords": [
     "mongoose",
     "mongodb",
@@ -11,7 +18,9 @@
     "integrity",
     "plugin",
     "middleware",
-    "database"
+    "database",
+    "typescript",
+    "typesafe"
   ],
   "author": "dothinh115@mail.com",
   "license": "ISC",
@@ -27,7 +36,19 @@
   "engines": {
     "node": ">=12.0.0"
   },
+  "devDependencies": {
+    "@types/mongoose": "^5.11.96",
+    "@types/node": "^20.19.11",
+    "mongodb-memory-server": "^10.2.0",
+    "mongoose": "^8.18.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.2"
+  },
   "peerDependencies": {
     "mongoose": ">=5.0.0"
-  }
+  },
+  "files": [
+    "dist/",
+    "README.md"
+  ]
 }

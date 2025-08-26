@@ -1,16 +1,16 @@
-# Mongoose Reference Check
+# mongoose-reference-check
 
-A Mongoose plugin that validates reference integrity before save, update, and delete operations. It ensures that referenced documents exist and prevents deletion of records that are still being referenced elsewhere.
+A **TypeScript-ready** Mongoose plugin that validates reference integrity before save, update, and delete operations with performance optimizations and comprehensive error handling.
 
 ## Features
 
-- ✅ **Automatic validation** on save, update, and delete operations
-- ✅ **Performance optimized** with aggregation pipelines and batch operations
-- ✅ **Configurable** - enable/disable specific operations
-- ✅ **Comprehensive error handling** with detailed error messages
-- ✅ **Logging support** for debugging and monitoring
-- ✅ **Utility methods** for manual reference validation
-- ✅ **Array support** - handles both single values and arrays of references
+- ✅ **Reference validation** before save and update operations
+- ✅ **Cascade delete protection** - prevents deleting documents that are referenced
+- ✅ **Array reference support** - validates arrays of ObjectIds
+- ✅ **Performance optimized** with batch operations and aggregation pipelines
+- ✅ **TypeScript ready** with full type definitions
+- ✅ **Zero configuration** - works out of the box with sensible defaults
+- ✅ **Utility methods** for manual reference checking
 
 ## Installation
 
@@ -18,75 +18,152 @@ A Mongoose plugin that validates reference integrity before save, update, and de
 npm install mongoose-reference-check
 ```
 
-Or if you are using yarn:
+## Quick Start
 
-```bash
-yarn add mongoose-reference-check
-```
-
-## Basic Usage
-
-### Global Plugin (Recommended)
+### JavaScript
 
 ```javascript
 const mongoose = require("mongoose");
 const ReferenceCheck = require("mongoose-reference-check");
 
-// Connect to MongoDB
-mongoose
-  .connect("mongodb://127.0.0.1:27017/test")
-  .then(() => console.log("Connected to MongoDB"))
-  .catch((err) => console.error("MongoDB connection error:", err));
-
-// Apply globally to all schemas
-mongoose.plugin(ReferenceCheck);
-```
-
-### Per-Schema Plugin
-
-```javascript
-const mongoose = require("mongoose");
-const ReferenceCheck = require("mongoose-reference-check");
-
-const userSchema = new mongoose.Schema({
-  name: String,
-  email: String,
-});
-
-const tagSchema = new mongoose.Schema({
-  name: String,
-  color: String,
-});
-
-const postSchema = new mongoose.Schema({
+const PostSchema = new mongoose.Schema({
   title: String,
   content: String,
-  author: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-  tags: [{ type: mongoose.Schema.Types.ObjectId, ref: "Tag" }],
+  author: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  categories: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Category' }]
 });
 
-// Create models first
-const User = mongoose.model("User", userSchema);
-const Tag = mongoose.model("Tag", tagSchema);
-const Post = mongoose.model("Post", postSchema);
+// Apply the plugin
+PostSchema.plugin(ReferenceCheck);
 
-// Apply to specific schema
-postSchema.plugin(ReferenceCheck);
+const Post = mongoose.model('Post', PostSchema);
+```
+
+### TypeScript
+
+```typescript
+import mongoose, { Schema, Document } from 'mongoose';
+import ReferenceCheck from 'mongoose-reference-check';
+
+interface IUser extends Document {
+  name: string;
+  email: string;
+}
+
+interface IPost extends Document {
+  title: string;
+  content: string;
+  author: mongoose.Types.ObjectId;
+  categories: mongoose.Types.ObjectId[];
+}
+
+const PostSchema = new Schema<IPost>({
+  title: String,
+  content: String,
+  author: { type: Schema.Types.ObjectId, ref: 'User' },
+  categories: [{ type: Schema.Types.ObjectId, ref: 'Category' }]
+});
+
+// Apply the plugin
+PostSchema.plugin(ReferenceCheck);
+
+const Post = mongoose.model<IPost>('Post', PostSchema);
+```
+
+## Usage Examples
+
+### Basic Validation
+
+```typescript
+// This will validate that the author and categories exist
+const post = new Post({
+  title: 'Hello World',
+  content: 'This is my first post',
+  author: new mongoose.Types.ObjectId(), // Must exist in User collection
+  categories: [categoryId1, categoryId2] // Must exist in Category collection
+});
+
+try {
+  await post.save(); // Throws error if references don't exist
+} catch (error) {
+  console.log(error.message); // "Reference validation failed: The value ... does not exist within User"
+}
+```
+
+### Update Validation
+
+```typescript
+// This will validate references in update operations
+try {
+  await Post.findByIdAndUpdate(postId, {
+    author: nonExistentUserId // Will throw validation error
+  });
+} catch (error) {
+  console.log(error.message);
+}
+```
+
+### Delete Protection
+
+```typescript
+// This will prevent deleting users that are referenced in posts
+try {
+  await User.findByIdAndDelete(userId); // Throws error if user is referenced
+} catch (error) {
+  console.log(error.message); // "Cannot delete record: It is referenced in Post model"
+}
+```
+
+### Manual Reference Checking
+
+```typescript
+// Check references on a document instance
+const post = await Post.findById(postId);
+const results = await post.checkReferences();
+console.log(results);
+// [
+//   { field: 'author', refTo: 'User', value: ObjectId('...'), isValid: true },
+//   { field: 'categories', refTo: 'Category', value: [ObjectId('...')], isValid: false }
+// ]
+
+// Check references on model (static method)
+const results = await Post.validateReferences({
+  author: userId,
+  categories: [cat1, cat2]
+});
 ```
 
 ## Configuration Options
 
-```javascript
-const ReferenceCheck = require("mongoose-reference-check");
+```typescript
+import ReferenceCheck, { ReferenceCheckOptions } from 'mongoose-reference-check';
 
-// Custom configuration
-mongoose.plugin(ReferenceCheck, {
-  enableSave: true, // Enable validation on save (default: true)
-  enableUpdate: true, // Enable validation on update (default: true)
-  enableDelete: true, // Enable validation on delete (default: true)
-  enableLogging: true, // Enable console logging (default: false)
-  batchSize: 100, // Batch size for bulk operations (default: 100)
-});
+const options: ReferenceCheckOptions = {
+  enableSave: true,      // Enable save validation (default: true)
+  enableUpdate: true,    // Enable update validation (default: true) 
+  enableDelete: true,    // Enable delete protection (default: true)
+  enableLogging: false,  // Enable debug logging (default: false)
+  batchSize: 100        // Batch size for bulk operations (default: 100)
+};
+
+PostSchema.plugin(ReferenceCheck, options);
+```
+
+## TypeScript Support
+
+The plugin includes comprehensive TypeScript definitions:
+
+```typescript
+import { ReferenceCheckOptions, ValidationResult } from 'mongoose-reference-check';
+
+// Full type safety for options
+const options: ReferenceCheckOptions = {
+  enableSave: true,
+  enableLogging: false
+};
+
+// Typed validation results
+const results: ValidationResult[] = await post.checkReferences();
 ```
 
 ## Schema Requirements
@@ -268,9 +345,50 @@ createPost()
   .finally(() => mongoose.connection.close());
 ```
 
+## Supported Operations
+
+### Save Operations
+- `document.save()`
+- `Model.create()`
+- `Model.insertMany()`
+
+### Update Operations  
+- `Model.findByIdAndUpdate()`
+- `Model.findOneAndUpdate()`
+- `Model.updateOne()`
+- `Model.updateMany()`
+
+### Delete Operations
+- `Model.findByIdAndDelete()`
+- `Model.findOneAndDelete()`
+- `Model.deleteOne()`
+- `Model.deleteMany()`
+
+## Requirements
+
+- Node.js >= 12.0.0
+- Mongoose >= 5.0.0
+
+## Changelog
+
+### v2.0.0
+- ✨ **Full TypeScript rewrite** with comprehensive type definitions
+- 📦 **Modular type system** for better maintainability
+- 🎯 **Enhanced interfaces** for better developer experience
+- 🔄 **Backward compatible** - same API, enhanced with types
+- 📚 **Updated documentation** with TypeScript examples
+
+### v1.x
+- JavaScript implementation
+- Core reference validation functionality
+
 ## License
 
 ISC
+
+## Support
+
+I'm happy to help! If you encounter any issues or have suggestions, please [create an issue](https://github.com/dothinh115/mongoose-reference-check/issues) on GitHub.
 
 ## Contact
 
