@@ -15,6 +15,14 @@
   ],
   "author": "dothinh115@mail.com",
   "license": "ISC",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dothinh115/mongoose-reference-check.git"
+  },
+  "bugs": {
+    "url": "https://github.com/dothinh115/mongoose-reference-check/issues"
+  },
+  "homepage": "https://github.com/dothinh115/mongoose-reference-check#readme",
   "readme": "README.md",
   "engines": {
     "node": ">=12.0.0"
