@@ -392,4 +392,4 @@ I'm happy to help! If you encounter any issues or have suggestions, please [crea
 
 ## Contact
 
-dothinh115@mail.com
+dothinh115@gmail.com

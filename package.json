@@ -1,6 +1,6 @@
 {
   "name": "mongoose-reference-check",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "A TypeScript-ready Mongoose plugin that validates reference integrity before save, update, and delete operations with performance optimizations and comprehensive error handling",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -22,7 +22,7 @@
     "typescript",
     "typesafe"
   ],
-  "author": "dothinh115@mail.com",
+  "author": "dothinh115@gmail.com",
   "license": "ISC",
   "repository": {
     "type": "git",
